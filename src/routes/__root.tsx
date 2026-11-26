@@ -83,7 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Terminal KSP" },
       { name: "description", content: "Terminal mobilny KSP" },
-      { name: "theme-color", content: "#2e7d32" },
+      { name: "theme-color", content: "#1d3557" },
       { name: "mobile-web-app-capable", content: "yes" },
       { property: "og:title", content: "Terminal KSP" },
       { property: "og:description", content: "Terminal mobilny KSP" },
