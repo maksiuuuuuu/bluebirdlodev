@@ -36,8 +36,15 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useDb, uid, fmt, type Db, type Status, type Pojazd } from "@/lib/store";
+import { useDb, uid, fmt, type Db, type Status, type Pojazd, type Mandat as MandatType } from "@/lib/store";
 import { lookupRoblox, type RobloxUser } from "@/lib/roblox.functions";
+import { randomDrivingLicense } from "@/lib/permissions";
+import dowodFront from "@/assets/dowod-front.png.asset.json";
+import dowodBack from "@/assets/dowod-back.png.asset.json";
+import legitymacjaPolicji from "@/assets/legitymacja-policji.png.asset.json";
+import prawoJazdyFront from "@/assets/prawo-jazdy-front.png.asset.json";
+import prawoJazdyBack from "@/assets/prawo-jazdy-back.png.asset.json";
+import mandatKarny from "@/assets/mandat-karny.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -53,20 +60,21 @@ export const Route = createFileRoute("/")({
   component: App,
 });
 
-type Screen = "home" | "legit" | "interwencja" | "komunikaty" | "zdarzenia" | "mandat" | "wyrok" | "bazaM" | "bazaW" | "meldunki" | "dyspozycje" | "pojazdy" | "dodajPojazd" | "status" | "dyspozytor";
+type Screen = "home" | "legit" | "legitymacja" | "interwencja" | "komunikaty" | "zdarzenia" | "mandat" | "mandatPodglad" | "wyrok" | "bazaM" | "bazaW" | "meldunki" | "dyspozycje" | "pojazdy" | "dodajPojazd" | "status" | "dyspozytor";
 type Up = (f: (d: Db) => Partial<Db>) => void;
 
 const NAZWY: Record<Screen, string> = {
-  home: "Panel główny", legit: "Legitymowanie", interwencja: "Interwencja własna", komunikaty: "Komunikaty",
-  zdarzenia: "Zdarzenia", mandat: "Wystaw mandat", wyrok: "Wystaw wyrok", bazaM: "Baza mandatów", bazaW: "Baza wyroków",
+  home: "Panel główny", legit: "Legitymowanie", legitymacja: "Legitymacja służbowa", interwencja: "Interwencja własna", komunikaty: "Komunikaty",
+  zdarzenia: "Zdarzenia", mandat: "Wystaw mandat", mandatPodglad: "Podgląd mandatu", wyrok: "Wystaw wyrok", bazaM: "Baza mandatów", bazaW: "Baza wyroków",
   meldunki: "Meldunki", dyspozycje: "Dyspozycje", pojazdy: "Baza pojazdów", dodajPojazd: "Rejestracja pojazdu",
   status: "Status patrolu", dyspozytor: "Dyspozytor",
 };
-const PARENT: Partial<Record<Screen, Screen>> = { mandat: "zdarzenia", wyrok: "zdarzenia", bazaM: "zdarzenia", bazaW: "zdarzenia", dodajPojazd: "pojazdy", dyspozytor: "status" };
+const PARENT: Partial<Record<Screen, Screen>> = { mandat: "zdarzenia", mandatPodglad: "zdarzenia", wyrok: "zdarzenia", bazaM: "zdarzenia", bazaW: "zdarzenia", dodajPojazd: "pojazdy", dyspozytor: "status" };
 
 function App() {
   const { db, up, ready } = useDb();
   const [s, setS] = useState<Screen>("home");
+  const [ostatniMandat, setOstatniMandat] = useState<MandatType | null>(null);
   if (!ready) return <Shell><div className="min-h-[60vh]" /></Shell>;
   if (!db.zalogowany) return <Shell><Login onOk={() => up(() => ({ zalogowany: true }))} /></Shell>;
   const back = () => setS(PARENT[s] ?? "home");
@@ -85,10 +93,12 @@ function App() {
       )}
       {s === "home" && <Home db={db} up={up} go={setS} />}
       {s === "legit" && <Legit db={db} up={up} />}
+      {s === "legitymacja" && <LegitymacjaScreen db={db} />}
       {s === "interwencja" && <Interwencja db={db} up={up} />}
       {s === "komunikaty" && <Komunikaty db={db} up={up} />}
       {s === "zdarzenia" && <Menu items={[["Wystaw mandat", () => setS("mandat")], ["Wystaw wyrok", () => setS("wyrok")], ["Baza mandatów", () => setS("bazaM")], ["Baza wyroków", () => setS("bazaW")]]} />}
-      {s === "mandat" && <MandatForm up={up} done={() => setS("bazaM")} />}
+      {s === "mandat" && <MandatForm up={up} officer={db.nick} done={(m) => { setOstatniMandat(m); setS("mandatPodglad"); }} />}
+      {s === "mandatPodglad" && ostatniMandat && <MandatPodglad mandat={ostatniMandat} go={setS} />}
       {s === "wyrok" && <WyrokForm up={up} done={() => setS("bazaW")} />}
       {s === "bazaM" && <Baza title="Baza mandatów" rows={db.mandaty.map((m) => ({ id: m.id, t: `${m.nick} (${m.pesel})`, d: `${m.kwota} zł · ${m.pkt} pkt · ${m.powod}`, c: m.czas }))} onDel={(id) => up((d) => ({ mandaty: d.mandaty.filter((x) => x.id !== id) }))} />}
       {s === "bazaW" && <Baza title="Baza wyroków" rows={db.wyroki.map((m) => ({ id: m.id, t: `${m.nick} (${m.pesel})`, d: `${m.czasKary} · ${m.powod}`, c: m.czas }))} onDel={(id) => up((d) => ({ wyroki: d.wyroki.filter((x) => x.id !== id) }))} />}
@@ -213,6 +223,127 @@ function EmptyState({ icon: Icon, title, text }: { icon: LucideIcon; title: stri
   return <div className="rounded-md border border-dashed border-border bg-card px-4 py-7 text-center"><Icon size={30} strokeWidth={1.4} className="mx-auto text-muted-foreground" /><p className="mt-2 text-sm font-semibold">{title}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{text}</p></div>;
 }
 
+function DocumentSides({ side, onChange }: { side: "front" | "back"; onChange: (side: "front" | "back") => void }) {
+  return (
+    <div className="mb-2 grid grid-cols-2 gap-1 rounded-sm bg-secondary p-1">
+      <button className={`rounded-sm py-1.5 text-[10px] font-bold uppercase tracking-wider ${side === "front" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`} onClick={() => onChange("front")}>Awers</button>
+      <button className={`rounded-sm py-1.5 text-[10px] font-bold uppercase tracking-wider ${side === "back" ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`} onClick={() => onChange("back")}>Rewers</button>
+    </div>
+  );
+}
+
+function DowodDokument({ u }: { u: RobloxUser }) {
+  const [side, setSide] = useState<"front" | "back">("front");
+  const numer = `RBX ${u.id}`;
+  const dataUr = new Date(u.created).toLocaleDateString("pl-PL");
+  const dataWydania = new Date().toLocaleDateString("pl-PL");
+  return (
+    <div>
+      <DocumentSides side={side} onChange={setSide} />
+      <div className="document-card" style={{ aspectRatio: "358 / 231" }}>
+        <img src={side === "front" ? dowodFront.url : dowodBack.url} alt={side === "front" ? "Wzór przodu dowodu osobistego" : "Wzór tyłu dowodu osobistego"} className="h-auto w-full" draggable={false} />
+        {side === "front" ? (
+          <>
+            <span className="document-value" style={{ left: "39%", top: "26%", width: "43%" }}>{u.name}</span>
+            <span className="document-value" style={{ left: "39%", top: "43%", width: "43%" }}>{u.displayName}</span>
+            <span className="document-value" style={{ left: "39%", top: "61%", width: "24%" }}>polskie</span>
+            <span className="document-value" style={{ left: "65%", top: "61%", width: "25%" }}>{dataUr}</span>
+            <span className="document-value" style={{ left: "39%", top: "74%", width: "39%" }}>{numer}</span>
+            <span className="document-value" style={{ left: "39%", top: "84%", width: "34%" }}>31.12.2035</span>
+            {u.avatar && <img src={u.avatar} alt={`Zdjęcie ${u.name}`} className="document-photo" style={{ left: "76%", top: "44%", width: "18%", height: "31%" }} />}
+          </>
+        ) : (
+          <>
+            <span className="document-value" style={{ left: "5%", top: "17%", width: "48%" }}>{u.id}</span>
+            <span className="document-value" style={{ left: "65%", top: "17%", width: "31%" }}>{numer}</span>
+            <span className="document-value" style={{ left: "5%", top: "30%", width: "48%" }}>Roblox</span>
+            <span className="document-value" style={{ left: "5%", top: "42%", width: "50%" }}>{u.name}</span>
+            <span className="document-value" style={{ left: "5%", top: "54%", width: "50%" }}>Nie podano</span>
+            <span className="document-value" style={{ left: "67%", top: "54%", width: "28%" }}>{dataWydania}</span>
+            <span className="document-value" style={{ left: "5%", top: "65%", width: "65%" }}>Komendant Stołeczny Policji</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PrawoJazdyDokument({ u }: { u: RobloxUser }) {
+  const [side, setSide] = useState<"front" | "back">("front");
+  const numer = `RBX${u.id}`.slice(0, 20);
+  const dataUr = new Date(u.created).toLocaleDateString("pl-PL");
+  return (
+    <div>
+      <DocumentSides side={side} onChange={setSide} />
+      <div className="document-card" style={{ aspectRatio: "736 / 469" }}>
+        <img src={side === "front" ? prawoJazdyFront.url : prawoJazdyBack.url} alt={side === "front" ? "Wzór przodu prawa jazdy" : "Wzór tyłu prawa jazdy"} className="h-auto w-full" draggable={false} />
+        {side === "front" ? (
+          <>
+            <span className="document-value" style={{ left: "38%", top: "27%", width: "48%" }}>{u.name}</span>
+            <span className="document-value" style={{ left: "38%", top: "35%", width: "48%" }}>{u.displayName}</span>
+            <span className="document-value" style={{ left: "38%", top: "43%", width: "52%" }}>{dataUr} · Roblox</span>
+            <span className="document-value" style={{ left: "38%", top: "52%", width: "40%" }}>{new Date().toLocaleDateString("pl-PL")}</span>
+            <span className="document-value" style={{ left: "38%", top: "60%", width: "40%" }}>31.12.2035</span>
+            <span className="document-value" style={{ left: "38%", top: "68%", width: "48%" }}>Komendant Stołeczny Policji</span>
+            <span className="document-value" style={{ left: "38%", top: "77%", width: "45%" }}>{numer}</span>
+            {u.avatar && <img src={u.avatar} alt={`Zdjęcie ${u.name}`} className="document-photo" style={{ left: "5%", top: "24%", width: "20%", height: "48%" }} />}
+          </>
+        ) : (
+          <>
+            <span className="document-value document-value-small" style={{ left: "43%", top: "59%", width: "16%" }}>{new Date().toLocaleDateString("pl-PL")}</span>
+            <span className="document-value document-value-small" style={{ left: "60%", top: "59%", width: "16%" }}>31.12.2035</span>
+            <span className="document-value document-value-small" style={{ left: "78%", top: "59%", width: "17%" }}>KSP</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LegitymacjaScreen({ db }: { db: Db }) {
+  return (
+    <div className="space-y-3">
+      <SectionHeading icon={BadgeCheck} title="Legitymacja służbowa" subtitle="Dokument funkcjonariusza Policji" />
+      <div className="document-card mx-auto max-w-[290px] shadow-lg" style={{ aspectRatio: "279 / 450" }}>
+        <img src={legitymacjaPolicji.url} alt="Wzór legitymacji Policji obowiązujący od 2019 roku" className="h-auto w-full" draggable={false} />
+        <div className="document-photo flex items-center justify-center bg-secondary" style={{ left: "7%", top: "17%", width: "43%", height: "36%" }}><Shield size={52} strokeWidth={1.2} className="text-primary" /></div>
+        <span className="document-value" style={{ left: "57%", top: "45%", width: "38%" }}>KSP-217</span>
+        <span className="document-value" style={{ left: "57%", top: "55%", width: "38%" }}>31.12.2030</span>
+        <span className="document-value" style={{ left: "8%", top: "64%", width: "78%" }}>KSP-217</span>
+        <span className="document-value" style={{ left: "8%", top: "73%", width: "78%" }}>{db.nick}</span>
+        <span className="document-value" style={{ left: "8%", top: "81%", width: "78%" }}>Funkcjonariusz KSP</span>
+        <span className="document-value" style={{ left: "8%", top: "88%", width: "78%" }}>Aspirant</span>
+      </div>
+      <Panel title="Dane funkcjonariusza" icon={IdCard}>
+        <DataRow label="Jednostka" value="Komenda Stołeczna Policji" />
+        <DataRow label="Numer służbowy" value="KSP-217" />
+        <DataRow label="Nick" value={db.nick} />
+        <DataRow label="Stopień" value="Aspirant" />
+      </Panel>
+    </div>
+  );
+}
+
+function MandatDokument({ mandat: m }: { mandat: MandatType }) {
+  const numer = String(m.czas).slice(-7);
+  return (
+    <div className="document-card mandate-card" style={{ aspectRatio: "1765 / 1233" }}>
+      <img src={mandatKarny.url} alt="Wypełniony mandat karny" className="h-auto w-full" draggable={false} />
+      <span className="document-value document-mask" style={{ left: "77%", top: "2%", width: "19%", padding: "0.5%" }}>{numer}</span>
+      <span className="document-value" style={{ left: "4%", top: "22%", width: "28%" }}>{m.kwota} zł</span>
+      <span className="document-value" style={{ left: "14%", top: "33%", width: "65%" }}>{m.nick}</span>
+      <span className="document-value" style={{ left: "13%", top: "41%", width: "56%" }}>{m.pesel}</span>
+      <span className="document-value" style={{ left: "43%", top: "47%", width: "48%" }}>Dowód osobisty RBX {m.pesel}</span>
+      <span className="document-value mandate-reason" style={{ left: "4%", top: "61%", width: "88%" }}>{m.powod}</span>
+      <span className="document-value" style={{ left: "84%", top: "77%", width: "10%" }}>{m.pkt}</span>
+      <span className="document-value document-value-small" style={{ left: "4%", top: "86%", width: "23%" }}>{m.funkcjonariusz ?? "Funkcjonariusz KSP"}</span>
+      <span className="document-value" style={{ left: "35%", top: "85%", width: "26%" }}>{new Date(m.czas).toLocaleDateString("pl-PL")}</span>
+      <span className="document-value document-value-small" style={{ left: "4%", top: "94%", width: "23%" }}>{m.funkcjonariusz ?? "KSP"}</span>
+      <span className="document-value document-value-small" style={{ left: "35%", top: "94%", width: "24%" }}>{m.nick}</span>
+    </div>
+  );
+}
+
 function Home({ db, up, go }: { db: Db; up: Up; go: (s: Screen) => void }) {
   const wInt = db.interwencja !== null;
   const nowe = db.komunikaty.filter((k) => k.stan === "nowy").length;
@@ -248,6 +379,7 @@ function Home({ db, up, go }: { db: Db; up: Up; go: (s: Screen) => void }) {
         <p className="form-label mb-2">Panel operacyjny</p>
         <div className="grid grid-cols-2 gap-2">
           {T("Legitymowanie", "legit", UserRoundSearch)}
+          {T("Legitymacja służbowa", "legitymacja", BadgeCheck)}
           {T("Interwencja własna", "interwencja", ShieldCheck)}
           {T("Komunikaty", "komunikaty", MessageSquareText, false, nowe)}
           {T("Zdarzenia", "zdarzenia", ClipboardList)}
@@ -270,45 +402,48 @@ function Home({ db, up, go }: { db: Db; up: Up; go: (s: Screen) => void }) {
 function Legit({ db, up }: { db: Db; up: Up }) {
   const look = useServerFn(lookupRoblox);
   const [pesel, setPesel] = useState(""); const [u, setU] = useState<RobloxUser | null>(null);
-  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [prawko, setPrawko] = useState(false);
   const upr = u ? db.uprawnienia[String(u.id)] ?? { bron: false, prawko: false } : null;
-  const toggle = (k: "bron" | "prawko") => u && up((d) => {
+  const sprawdz = async () => {
+    if (!pesel || busy) return;
+    setBusy(true); setErr(""); setU(null); setPrawko(false);
+    try {
+      const r = await look({ data: { id: pesel } });
+      if (r.ok) { setU(r.user); setPrawko(randomDrivingLicense()); }
+      else setErr(r.error);
+    } catch { setErr("Nieprawidłowy PESEL"); }
+    setBusy(false);
+  };
+  const toggleBron = () => u && up((d) => {
     const cur = d.uprawnienia[String(u.id)] ?? { bron: false, prawko: false };
-    return { uprawnienia: { ...d.uprawnienia, [String(u.id)]: { ...cur, [k]: !cur[k] } } };
+    return { uprawnienia: { ...d.uprawnienia, [String(u.id)]: { ...cur, bron: !cur.bron } } };
   });
   const mand = u ? db.mandaty.filter((m) => m.pesel === String(u.id)) : [];
   const wyr = u ? db.wyroki.filter((m) => m.pesel === String(u.id)) : [];
   return (
     <div className="space-y-3">
-      <SectionHeading icon={IdCard} title="Legitymowanie" subtitle="Wyszukiwanie osoby w centralnej bazie" />
+      <SectionHeading icon={IdCard} title="Legitymowanie" subtitle="Wyszukiwanie osoby i weryfikacja dokumentów" />
       <Panel title="Identyfikator osoby" icon={Fingerprint}>
         <label className="block"><span className="form-label">PESEL / ID gracza Roblox</span><input className="field text-base font-semibold tracking-wider" inputMode="numeric" placeholder="Wpisz numer identyfikacyjny" value={pesel} onChange={(e) => setPesel(e.target.value.replace(/\D/g, ""))} /></label>
-        <button className="go mt-3 flex items-center justify-center gap-2" disabled={busy || !pesel} onClick={async () => {
-          setBusy(true); setErr(""); setU(null);
-          try { const r = await look({ data: { id: pesel } }); if (r.ok) setU(r.user); else setErr(r.error); } catch { setErr("Nieprawidłowy PESEL"); }
-          setBusy(false);
-        }}><Search size={17} />{busy ? "Trwa sprawdzanie..." : "Sprawdź w bazie"}</button>
+        <button className="go mt-3 flex items-center justify-center gap-2" disabled={busy || !pesel} onClick={() => void sprawdz()}><Search size={17} />{busy ? "Trwa sprawdzanie..." : "Sprawdź w bazie"}</button>
         {err && <p className="mt-2 flex items-center gap-2 text-xs font-medium text-destructive"><AlertTriangle size={14} />{err}</p>}
       </Panel>
-      {!u ? <EmptyState icon={UserRoundSearch} title="Brak danych do wyświetlenia" text="Wpisz ID gracza Roblox i wybierz „Sprawdź w bazie”, aby pobrać kartotekę osoby." /> : (
+      {!u ? <EmptyState icon={UserRoundSearch} title="Brak danych do wyświetlenia" text="Wpisz ID gracza Roblox i wybierz „Sprawdź w bazie”, aby wygenerować dokumenty osoby." /> : (
         <>
-          <Panel title="Kartoteka osoby" icon={IdCard} action={<Badge tone="ok"><Check size={11} /> Znaleziono</Badge>}>
-            <div className="mb-3 flex items-center gap-3 border-b border-border pb-3">
-              <div className="flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-secondary">
-                {u.avatar ? <img src={u.avatar} alt={u.name} className="h-full w-full object-cover" /> : <UserRound size={35} className="text-muted-foreground" />}
-              </div>
-              <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Imię i nazwisko / nick</p><p className="mt-1 break-words text-lg font-bold leading-tight">{u.name}</p><p className="mt-1 text-xs text-muted-foreground">{u.displayName}</p></div>
-            </div>
-            <DataRow label="ID gracza / PESEL" value={u.id} />
-            <DataRow label="Data utworzenia konta" value={new Date(u.created).toLocaleDateString("pl-PL")} />
-            <DataRow label="Pojazdy zarejestrowane" value={db.pojazdy.filter((p) => p.wlascicielPesel === String(u.id)).length} />
+          <Panel title="Dowód osobisty" icon={IdCard} action={<Badge tone="ok"><Check size={11} /> Znaleziono</Badge>}>
+            <DowodDokument u={u} />
           </Panel>
           <Panel title="Uprawnienia" icon={BadgeCheck}>
             <div className="space-y-2">
-              <button className="flex w-full items-center justify-between rounded-sm border border-border bg-background px-3 py-2.5 text-left" onClick={() => toggle("bron")}><span className="text-xs font-semibold">Pozwolenie na broń</span><Badge tone={upr?.bron ? "ok" : "danger"}>{upr?.bron ? "TAK" : "NIE"}</Badge></button>
-              <button className="flex w-full items-center justify-between rounded-sm border border-border bg-background px-3 py-2.5 text-left" onClick={() => toggle("prawko")}><span className="text-xs font-semibold">Prawo jazdy</span><Badge tone={upr?.prawko ? "ok" : "danger"}>{upr?.prawko ? "TAK" : "NIE"}</Badge></button>
+              <button className="flex w-full items-center justify-between rounded-sm border border-border bg-background px-3 py-2.5 text-left" onClick={toggleBron}><span className="text-xs font-semibold">Pozwolenie na broń</span><Badge tone={upr?.bron ? "ok" : "danger"}>{upr?.bron ? "TAK" : "NIE"}</Badge></button>
+              <div className="flex w-full items-center justify-between rounded-sm border border-border bg-background px-3 py-2.5"><span className="text-xs font-semibold">Prawo jazdy</span><Badge tone={prawko ? "ok" : "danger"}>{prawko ? "TAK" : "NIE"}</Badge></div>
             </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">Prawo jazdy jest losowane 50/50 przy każdym sprawdzeniu dowodu.</p>
+            <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-sm border border-primary/30 py-2 text-[10px] font-bold uppercase tracking-wide text-primary" disabled={busy} onClick={() => void sprawdz()}><Search size={14} /> Sprawdź ponownie — nowe losowanie</button>
           </Panel>
+          {prawko ? <Panel title="Prawo jazdy" icon={CarFront} action={<Badge tone="ok">Kategoria B</Badge>}><PrawoJazdyDokument u={u} /></Panel> : (
+            <div className="flex items-start gap-3 rounded-md border border-destructive/25 bg-destructive/10 p-3"><AlertTriangle size={21} className="shrink-0 text-destructive" /><div><p className="text-xs font-bold uppercase tracking-wide text-destructive">Brak prawa jazdy</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Przy tym sprawdzeniu nie wylosowano uprawnienia. Kolejne sprawdzenie ponownie losuje wynik 50/50.</p></div></div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-md border border-border bg-card p-2 text-center"><p className="text-xl font-bold text-primary">{mand.length}</p><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Mandaty</p></div>
             <div className="rounded-md border border-border bg-card p-2 text-center"><p className="text-xl font-bold text-primary">{mand.reduce((a, m) => a + m.pkt, 0)}</p><p className="text-[9px] uppercase tracking-wide text-muted-foreground">Punkty karne</p></div>
@@ -386,7 +521,7 @@ function useNick() {
   return async (pesel: string) => { try { const r = await look({ data: { id: pesel } }); return r.ok ? r.user.name : null; } catch { return null; } };
 }
 
-function MandatForm({ up, done }: { up: Up; done: () => void }) {
+function MandatForm({ up, officer, done }: { up: Up; officer: string; done: (m: MandatType) => void }) {
   const nick = useNick();
   const [f, setF] = useState({ pesel: "", kwota: "", pkt: "", powod: "" }); const [err, setErr] = useState("");
   return (
@@ -404,11 +539,27 @@ function MandatForm({ up, done }: { up: Up; done: () => void }) {
           <button className="go flex items-center justify-center gap-2 py-2.5" onClick={async () => {
             if (!f.pesel || !f.kwota || !f.powod) return setErr("Uzupełnij wszystkie wymagane pola");
             const n = await nick(f.pesel); if (!n) return setErr("Brak osoby w bazie");
-            up((d) => ({ mandaty: [{ id: uid(), pesel: f.pesel, nick: n, kwota: +f.kwota, pkt: +f.pkt || 0, powod: f.powod, czas: Date.now() }, ...d.mandaty] }));
-            done();
+            const m: MandatType = { id: uid(), pesel: f.pesel, nick: n, kwota: +f.kwota, pkt: +f.pkt || 0, powod: f.powod, czas: Date.now(), funkcjonariusz: officer };
+            up((d) => ({ mandaty: [m, ...d.mandaty] }));
+            done(m);
           }}><FileText size={17} /> Wystaw mandat</button>
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function MandatPodglad({ mandat, go }: { mandat: MandatType; go: (s: Screen) => void }) {
+  return (
+    <div className="space-y-3">
+      <SectionHeading icon={FileText} title="Mandat wystawiony" subtitle="Dokument został zapisany w bazie mandatów" />
+      <div className="flex items-center gap-2 rounded-sm border border-ok/25 bg-ok/10 px-3 py-2 text-xs font-semibold text-ok"><Check size={17} /> Mandat karny został poprawnie wystawiony</div>
+      <MandatDokument mandat={mandat} />
+      <p className="text-center text-[10px] text-muted-foreground">Dokument jest widokiem szkoleniowym na podstawie przesłanego wzoru.</p>
+      <div className="grid grid-cols-2 gap-2">
+        <button className="tile" onClick={() => go("bazaM")}>Baza mandatów</button>
+        <button className="go" onClick={() => go("home")}>Panel główny</button>
+      </div>
     </div>
   );
 }

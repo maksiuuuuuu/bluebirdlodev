@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 export type Status = "Wolny" | "Zajęty" | "W trakcie interwencji" | "W drodze na interwencję" | "Przerwa";
 export type Komunikat = { id: string; powod: string; wzywajacy: string; czas: number; stan: "nowy" | "przyjety" | "odrzucony" };
-export type Mandat = { id: string; pesel: string; nick: string; kwota: number; pkt: number; powod: string; czas: number };
+export type Mandat = { id: string; pesel: string; nick: string; kwota: number; pkt: number; powod: string; czas: number; funkcjonariusz?: string };
 export type Wyrok = { id: string; pesel: string; nick: string; czasKary: string; powod: string; czas: number };
 export type Pojazd = { rej: string; marka: string; kolor: string; wlascicielPesel: string; wlasciciel: string; oc: boolean; przeglad: boolean; poszukiwany: boolean; foto: string };
 export type Meldunek = { id: string; tresc: string; czas: number };

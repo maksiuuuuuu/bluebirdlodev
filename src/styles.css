@@ -164,4 +164,21 @@
   .go { @apply w-full rounded-sm bg-primary px-3 py-2 text-sm font-bold text-primary-foreground shadow-sm active:brightness-95 disabled:opacity-45; }
   .danger { @apply bg-destructive text-destructive-foreground; }
   .menu-tile { @apply flex min-h-[74px] w-full items-center gap-2.5 rounded-md border border-border bg-card p-3 text-card-foreground shadow-sm active:bg-secondary disabled:opacity-45; }
+  .document-card { @apply relative mx-auto w-full overflow-hidden rounded-[10px] border border-border bg-card shadow-sm; }
+  .document-card > img { display: block; width: 100%; height: 100%; object-fit: cover; user-select: none; }
+  .document-value {
+    position: absolute;
+    z-index: 2;
+    color: var(--foreground);
+    font-size: clamp(6px, 2.15vw, 10px);
+    font-weight: 700;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+  .document-value-small { font-size: clamp(5px, 1.8vw, 8px); font-weight: 600; }
+  .document-photo { position: absolute; z-index: 1; object-fit: cover; overflow: hidden; }
+  .document-mask { background: var(--card); text-align: center; }
+  .mandate-card { border-radius: 2px; }
+  .mandate-card .document-value { font-size: clamp(6px, 2vw, 9px); }
+  .mandate-card .mandate-reason { line-height: 1.35; max-height: 15%; overflow: hidden; }
 }
