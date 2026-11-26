@@ -44,6 +44,13 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-tile: var(--tile);
+  --color-tile-foreground: var(--tile-foreground);
+  --color-alert: var(--alert);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-ok: var(--ok);
+  --font-sans: 'Source Sans 3', Arial, sans-serif;
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -80,8 +87,14 @@
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.52 0.13 145);
+  --primary-foreground: oklch(0.98 0 0);
+  --tile: oklch(0.8 0 0);
+  --tile-foreground: oklch(0.15 0 0);
+  --alert: oklch(0.68 0.16 15);
+  --panel: oklch(0.3 0.01 260);
+  --panel-foreground: oklch(0.97 0 0);
+  --ok: oklch(0.72 0.17 150);
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
@@ -153,4 +166,11 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+@layer components {
+  .tile { @apply bg-tile text-tile-foreground flex items-center justify-center text-center px-2 py-2 text-sm uppercase active:brightness-90 disabled:opacity-50; }
+  .field { @apply bg-tile text-tile-foreground w-full text-center px-2 py-1.5 text-sm placeholder:text-tile-foreground/70 outline-none focus:ring-2 focus:ring-primary; }
+  .go { @apply bg-primary text-primary-foreground w-full py-1.5 text-sm active:brightness-90; }
+  .danger { @apply bg-destructive text-destructive-foreground; }
 }
